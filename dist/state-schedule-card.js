@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -217,7 +217,7 @@ export class StateScheduleCard extends Base {
         field('entity', anySelect, 'Scheduled entity', 'The input_select / select the schedule writes to. Its options are the states you can paint.', { required: true }),
         field('title', { text: {} }, 'Title'),
         field('current', anySelect, 'Entity shown as "Now"', 'Optional. The entity holding the state actually in effect. Defaults to the scheduled entity.'),
-        field('collapsed', { boolean: {} }, 'Start collapsed'),
+        field('collapsed', { boolean: {} }, 'Start collapsed', undefined, { default: true }),
         group('override', 'Override', [
           field('entity', anySelect, 'Override entity', 'An input_select / select whose options are the "follow the schedule" option plus every state.'),
           field('sticky', { entity: { domain: 'input_boolean' } }, '"Keep override" checkbox entity', 'Optional input_boolean. When on, an override survives schedule changes.'),
@@ -242,10 +242,12 @@ export class StateScheduleCard extends Base {
                 },
               },
               'Grid resolution',
+              undefined,
+              { default: '30' },
             ),
             field('default_state', { text: {} }, 'Default state', 'State used for unpainted time. Defaults to "On" if the entity has it, else its first option.'),
-            field('apply_now', { boolean: {} }, 'Apply the new schedule immediately after saving'),
-            field('row_height', { number: { min: 6, max: 40, mode: 'box' } }, 'Row height (px)'),
+            field('apply_now', { boolean: {} }, 'Apply the new schedule immediately after saving', undefined, { default: true }),
+            field('row_height', { number: { min: 6, max: 40, mode: 'box' } }, 'Row height (px)', undefined, { default: 14 }),
             field('name', { text: {} }, 'Name for the Scheduler entries', 'Base name for the entries the card creates. Defaults to the entity name.'),
           ],
           { flatten: true },
