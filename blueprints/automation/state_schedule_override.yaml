@@ -45,7 +45,7 @@ blueprint:
         entity:
           domain: input_boolean
     none_option:
-      name: "Follow the schedule" option
+      name: Follow-the-schedule option
       description: The option of the override entity that means "no override".
       default: Schedule
       selector:
