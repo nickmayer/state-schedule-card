@@ -27,6 +27,8 @@ The built-in `schedule` helper is on/off only, and the Scheduler card edits one 
 
 ## Use
 
+Add it from the dashboard editor (**Add card → State Schedule Card**) and configure it in the visual editor, or use YAML. The per-state `states` option (custom labels/colors) is YAML-only.
+
 ```yaml
 type: custom:state-schedule-card
 entity: input_select.internet_cole

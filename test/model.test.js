@@ -11,6 +11,7 @@ import {
   gridToSchedules,
   optionAt,
   overrideActive,
+  StateScheduleCard,
 } from '../dist/state-schedule-card.js';
 
 const STEP = 30;
@@ -123,4 +124,30 @@ test('overrideActive: only a non-"follow schedule" value counts', () => {
   assert.equal(overrideActive('Off', 'Schedule'), true);
   assert.equal(overrideActive('unavailable', 'Schedule'), false);
   assert.equal(overrideActive(undefined, 'Schedule'), false);
+});
+
+test('visual editor form: schema, labels and nested override fields', () => {
+  const form = StateScheduleCard.getConfigForm();
+  const top = form.schema.map((f) => f.name);
+  assert.deepEqual(top, ['entity', 'title', 'current', 'collapsed', 'override', 'appearance']);
+
+  const entity = form.schema.find((f) => f.name === 'entity');
+  assert.equal(entity.required, true);
+  assert.equal(form.computeLabel(entity), 'Scheduled entity');
+
+  // the nested override.entity shares a name with the top-level one but needs its own label
+  const override = form.schema.find((f) => f.name === 'override');
+  assert.equal(override.type, 'expandable');
+  const nested = override.schema.find((f) => f.name === 'entity');
+  assert.equal(form.computeLabel(nested), 'Override entity');
+  assert.notEqual(form.computeLabel(nested), form.computeLabel(entity));
+
+  // flattened group keeps its keys at the top level of the config
+  const appearance = form.schema.find((f) => f.name === 'appearance');
+  assert.equal(appearance.flatten, true);
+  assert.deepEqual(appearance.schema.map((f) => f.name), ['step', 'default_state', 'apply_now', 'row_height', 'name']);
+
+  // every field has a label (no raw key names shown to the user)
+  const all = [...form.schema, ...override.schema, ...appearance.schema];
+  for (const f of all) assert.notEqual(form.computeLabel(f), f.name, `missing label for ${f.name}`);
 });

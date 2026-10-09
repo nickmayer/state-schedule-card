@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -178,7 +178,7 @@ export function optionAt(grid, step, date) {
 
 const Base = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
 
-class StateScheduleCard extends Base {
+export class StateScheduleCard extends Base {
   constructor() {
     super();
     this._grid = null;
@@ -195,6 +195,65 @@ class StateScheduleCard extends Base {
   static getStubConfig(hass) {
     const e = Object.keys(hass.states).find((k) => k.startsWith('input_select.'));
     return { entity: e || 'input_select.my_mode' };
+  }
+
+  /** Schema for Home Assistant's built-in visual editor (ha-form). */
+  static getConfigForm() {
+    const info = new Map(); // field -> { label, help }
+    const field = (name, selector, label, help, extra = {}) => {
+      const f = { name, selector, ...extra };
+      info.set(f, { label, help });
+      return f;
+    };
+    const group = (name, title, schema, extra = {}) => {
+      const g = { name, type: 'expandable', title, schema, ...extra };
+      info.set(g, { label: title });
+      return g;
+    };
+    const anySelect = { entity: { domain: ['input_select', 'select'] } };
+
+    return {
+      schema: [
+        field('entity', anySelect, 'Scheduled entity', 'The input_select / select the schedule writes to. Its options are the states you can paint.', { required: true }),
+        field('title', { text: {} }, 'Title'),
+        field('current', anySelect, 'Entity shown as "Now"', 'Optional. The entity holding the state actually in effect. Defaults to the scheduled entity.'),
+        field('collapsed', { boolean: {} }, 'Start collapsed'),
+        group('override', 'Override', [
+          field('entity', anySelect, 'Override entity', 'An input_select / select whose options are the "follow the schedule" option plus every state.'),
+          field('sticky', { entity: { domain: 'input_boolean' } }, '"Keep override" checkbox entity', 'Optional input_boolean. When on, an override survives schedule changes.'),
+          field('none_option', { text: {} }, '"Follow the schedule" option', 'The override option that means "no override". Defaults to the first option.'),
+        ]),
+        group(
+          'appearance',
+          'Appearance & behaviour',
+          [
+            field(
+              'step',
+              {
+                select: {
+                  mode: 'dropdown',
+                  options: [
+                    { value: '10', label: '10 minutes' },
+                    { value: '15', label: '15 minutes' },
+                    { value: '20', label: '20 minutes' },
+                    { value: '30', label: '30 minutes (default)' },
+                    { value: '60', label: '1 hour' },
+                  ],
+                },
+              },
+              'Grid resolution',
+            ),
+            field('default_state', { text: {} }, 'Default state', 'State used for unpainted time. Defaults to "On" if the entity has it, else its first option.'),
+            field('apply_now', { boolean: {} }, 'Apply the new schedule immediately after saving'),
+            field('row_height', { number: { min: 6, max: 40, mode: 'box' } }, 'Row height (px)'),
+            field('name', { text: {} }, 'Name for the Scheduler entries', 'Base name for the entries the card creates. Defaults to the entity name.'),
+          ],
+          { flatten: true },
+        ),
+      ],
+      computeLabel: (schema) => (info.get(schema) || {}).label || schema.name,
+      computeHelper: (schema) => (info.get(schema) || {}).help,
+    };
   }
 
   setConfig(config) {
