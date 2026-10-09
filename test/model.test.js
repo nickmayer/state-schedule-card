@@ -11,6 +11,8 @@ import {
   gridToSchedules,
   optionAt,
   overrideActive,
+  formatDevices,
+  formatMeasurement,
   StateScheduleCard,
 } from '../dist/state-schedule-card.js';
 
@@ -129,7 +131,7 @@ test('overrideActive: only a non-"follow schedule" value counts', () => {
 test('visual editor form: schema, labels and nested override fields', () => {
   const form = StateScheduleCard.getConfigForm();
   const top = form.schema.map((f) => f.name);
-  assert.deepEqual(top, ['entity', 'title', 'current', 'collapsed', 'override', 'appearance']);
+  assert.deepEqual(top, ['entity', 'title', 'current', 'collapsed', 'devices', 'traffic', 'override', 'appearance']);
 
   const entity = form.schema.find((f) => f.name === 'entity');
   assert.equal(entity.required, true);
@@ -150,4 +152,16 @@ test('visual editor form: schema, labels and nested override fields', () => {
   // every field has a label (no raw key names shown to the user)
   const all = [...form.schema, ...override.schema, ...appearance.schema];
   for (const f of all) assert.notEqual(form.computeLabel(f), f.name, `missing label for ${f.name}`);
+});
+
+test('formatDevices / formatMeasurement', () => {
+  assert.equal(formatDevices('0'), '0 devices');
+  assert.equal(formatDevices('1'), '1 device');
+  assert.equal(formatDevices('7'), '7 devices');
+  assert.equal(formatDevices('unavailable'), '–');
+  assert.equal(formatDevices(undefined), '–');
+  assert.equal(formatMeasurement('1.234', 'Mbps'), '1.2 Mbps');
+  assert.equal(formatMeasurement('250.7', 'kB/s'), '251 kB/s');
+  assert.equal(formatMeasurement('unknown', 'Mbps'), '–');
+  assert.equal(formatMeasurement('3'), '3');
 });

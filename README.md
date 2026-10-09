@@ -48,6 +48,8 @@ title: Cole – weekly internet schedule
 | `collapsed` | `true` | Start collapsed to a single line (title + current state). Click the header to expand |
 | `current` | `entity` | Entity shown in the "Now:" chip — the state actually in effect (see *Override*) |
 | `override` | – | Enables the override controls, see below |
+| `devices` | – | Optional sensor whose state is a device count; shown on the top line as "3 devices" |
+| `traffic` | – | Optional numeric sensor (e.g. a data rate); shown on the top line with its unit |
 
 Click a **day name** to fill that whole day with the selected state.
 

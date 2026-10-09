@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.3.1';
+export const VERSION = '0.4.0';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -161,6 +161,21 @@ export function gridToSchedules(grid, { entity, step, baseName, service }) {
   }));
 }
 
+/** "3 devices" / "1 device" / "–" for a count sensor state. */
+export function formatDevices(state) {
+  const n = Number(state);
+  if (state === undefined || state === null || state === '' || Number.isNaN(n)) return '–';
+  return `${n} ${n === 1 ? 'device' : 'devices'}`;
+}
+
+/** "1.5 Mbps" style text for a numeric sensor state + its unit. */
+export function formatMeasurement(state, unit) {
+  const n = Number(state);
+  if (state === undefined || state === null || state === '' || Number.isNaN(n)) return '–';
+  const v = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
+  return unit ? `${v} ${unit}` : String(v);
+}
+
 /** True when an override helper is set to something other than its "follow the schedule" option. */
 export function overrideActive(overrideState, noneOption) {
   return !!overrideState && !['unknown', 'unavailable'].includes(overrideState) && overrideState !== noneOption;
@@ -218,6 +233,8 @@ export class StateScheduleCard extends Base {
         field('title', { text: {} }, 'Title'),
         field('current', anySelect, 'Entity shown as "Now"', 'Optional. The entity holding the state actually in effect. Defaults to the scheduled entity.'),
         field('collapsed', { boolean: {} }, 'Start collapsed', undefined, { default: true }),
+        field('devices', { entity: { domain: 'sensor' } }, 'Device count sensor', 'Optional. A sensor whose state is a number of devices; shown on the top line.'),
+        field('traffic', { entity: { domain: 'sensor' } }, 'Traffic sensor', 'Optional. A numeric sensor (for example a data rate); shown on the top line with its unit.'),
         group('override', 'Override', [
           field('entity', anySelect, 'Override entity', 'An input_select / select whose options are the "follow the schedule" option plus every state.'),
           field('sticky', { entity: { domain: 'input_boolean' } }, '"Keep override" checkbox entity', 'Optional input_boolean. When on, an override survives schedule changes.'),
@@ -295,6 +312,7 @@ export class StateScheduleCard extends Base {
     const key = this._scheduleKey();
     if (!this._grid || (!this._dirty() && key !== this._loadedKey)) this._load(key);
     this._updateChip();
+    this._updateMeta();
     this._updateOverride();
   }
 
@@ -504,6 +522,17 @@ export class StateScheduleCard extends Base {
     else if (!dirty && this._status === 'Unsaved changes') this._setStatus('');
   }
 
+  _updateMeta() {
+    const el = this.shadowRoot.querySelector('.meta');
+    if (!el || !this._hass) return;
+    const parts = [];
+    const dev = this._config.devices && this._hass.states[this._config.devices];
+    if (this._config.devices) parts.push(formatDevices(dev ? dev.state : undefined));
+    const tr = this._config.traffic && this._hass.states[this._config.traffic];
+    if (this._config.traffic) parts.push(formatMeasurement(tr ? tr.state : undefined, tr && tr.attributes.unit_of_measurement));
+    el.textContent = parts.join(' · ');
+  }
+
   _updateChip() {
     const chip = this.shadowRoot.querySelector('.chip');
     if (!chip || !this._hass) return;
@@ -563,6 +592,7 @@ export class StateScheduleCard extends Base {
         .top { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; -webkit-user-select:none; }
         .top:focus-visible { outline:2px solid var(--primary-color); border-radius:6px; }
         .title { font-size:1.2em; font-weight:500; flex:1; }
+        .meta { font-size:.85em; color:var(--secondary-text-color); white-space:nowrap; }
         .chev { transition:transform .15s; color:var(--secondary-text-color); font-size:1.2em; }
         .chev.open { transform:rotate(180deg); }
         .content { margin-top:8px; }
@@ -594,6 +624,7 @@ export class StateScheduleCard extends Base {
       <ha-card>
         <div class="top" role="button" tabindex="0" aria-expanded="${this._expanded}">
           <div class="title">${title}</div>
+          <div class="meta"></div>
           <div class="chip"></div>
           <div class="chev${this._expanded ? ' open' : ''}">▾</div>
         </div>
@@ -651,6 +682,7 @@ export class StateScheduleCard extends Base {
     if (box) box.addEventListener('change', () => this._setSticky(box.checked));
 
     this._updateChip();
+    this._updateMeta();
     this._updateOverride();
     this._updateDirty();
   }
