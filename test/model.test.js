@@ -10,6 +10,7 @@ import {
   columnToBlocks,
   gridToSchedules,
   optionAt,
+  overrideActive,
 } from '../dist/state-schedule-card.js';
 
 const STEP = 30;
@@ -115,4 +116,11 @@ test('optionAt maps a Date to the right cell (Monday-first)', () => {
   assert.equal(optionAt(grid, STEP, sunday), 'Off');
   const monday = new Date(2026, 9, 12, 0, 15);
   assert.equal(optionAt(grid, STEP, monday), 'On');
+});
+
+test('overrideActive: only a non-"follow schedule" value counts', () => {
+  assert.equal(overrideActive('Schedule', 'Schedule'), false);
+  assert.equal(overrideActive('Off', 'Schedule'), true);
+  assert.equal(overrideActive('unavailable', 'Schedule'), false);
+  assert.equal(overrideActive(undefined, 'Schedule'), false);
 });

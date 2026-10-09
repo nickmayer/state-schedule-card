@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -161,6 +161,11 @@ export function gridToSchedules(grid, { entity, step, baseName, service }) {
   }));
 }
 
+/** True when an override helper is set to something other than its "follow the schedule" option. */
+export function overrideActive(overrideState, noneOption) {
+  return !!overrideState && !['unknown', 'unavailable'].includes(overrideState) && overrideState !== noneOption;
+}
+
 export function optionAt(grid, step, date) {
   const di = (date.getDay() + 6) % 7;
   const row = Math.floor((date.getHours() * 60 + date.getMinutes()) / step);
@@ -198,7 +203,15 @@ class StateScheduleCard extends Base {
     }
     const step = Number(config.step || 30);
     if (![10, 15, 20, 30, 60].includes(step)) throw new Error('state-schedule-card: "step" must be 10, 15, 20, 30 or 60');
-    this._config = { apply_now: true, row_height: 14, ...config, step };
+    const ov = config.override;
+    if (ov && (!ov.entity || !/^(input_select|select)\./.test(ov.entity))) {
+      throw new Error('state-schedule-card: "override.entity" must be an input_select or select entity');
+    }
+    if (ov && ov.sticky && !/^input_boolean\./.test(ov.sticky)) {
+      throw new Error('state-schedule-card: "override.sticky" must be an input_boolean entity');
+    }
+    this._config = { apply_now: true, row_height: 14, collapsed: true, ...config, step };
+    if (this._expanded === undefined) this._expanded = !this._config.collapsed;
     this._grid = null;
     this._loadedKey = null;
     this._render();
@@ -221,6 +234,50 @@ class StateScheduleCard extends Base {
     const key = this._scheduleKey();
     if (!this._grid || (!this._dirty() && key !== this._loadedKey)) this._load(key);
     this._updateChip();
+    this._updateOverride();
+  }
+
+  /* ---- override -------------------------------------------------- */
+
+  get _ov() {
+    const cfg = this._config.override;
+    if (!cfg || !this._hass) return null;
+    const ent = this._hass.states[cfg.entity];
+    if (!ent) return null;
+    const options = ent.attributes.options || [];
+    const none = cfg.none_option && options.includes(cfg.none_option) ? cfg.none_option : options[0];
+    const sticky = cfg.sticky ? this._hass.states[cfg.sticky] : null;
+    return { entity: cfg.entity, options, none, state: ent.state, stickyEntity: cfg.sticky, sticky: sticky ? sticky.state === 'on' : false };
+  }
+
+  _setOverride(option) {
+    const ov = this._ov;
+    if (!ov) return;
+    const domain = ov.entity.split('.')[0];
+    this._hass.callService(domain, 'select_option', { entity_id: ov.entity, option });
+  }
+
+  _setSticky(on) {
+    const ov = this._ov;
+    if (!ov || !ov.stickyEntity) return;
+    this._hass.callService('input_boolean', on ? 'turn_on' : 'turn_off', { entity_id: ov.stickyEntity });
+  }
+
+  _updateOverride() {
+    const ov = this._ov;
+    const root = this.shadowRoot;
+    if (!ov) return;
+    root.querySelectorAll('.ovbtn').forEach((b) => b.classList.toggle('active', b.dataset.opt === ov.state));
+    const box = root.querySelector('#sticky');
+    if (box) box.checked = ov.sticky;
+    const hint = root.querySelector('.ovhint');
+    if (hint) {
+      hint.textContent = !overrideActive(ov.state, ov.none)
+        ? 'Following the schedule.'
+        : ov.sticky
+          ? 'Overridden until you switch back to the schedule.'
+          : 'Overridden until the schedule next changes.';
+    }
   }
 
   /* ---- data ------------------------------------------------------ */
@@ -389,8 +446,11 @@ class StateScheduleCard extends Base {
   _updateChip() {
     const chip = this.shadowRoot.querySelector('.chip');
     if (!chip || !this._hass) return;
-    const state = this._hass.states[this._config.entity].state;
-    chip.textContent = `Now: ${this._label(state)}`;
+    const currentEntity = this._hass.states[this._config.current || this._config.entity];
+    const state = currentEntity ? currentEntity.state : 'unknown';
+    const ov = this._ov;
+    const overridden = ov && overrideActive(ov.state, ov.none);
+    chip.textContent = `Now: ${this._label(state)}${overridden ? ' · override' : ''}`;
     chip.style.background = this._color(state);
   }
 
@@ -413,6 +473,17 @@ class StateScheduleCard extends Base {
       .map((o) => `<button class="swatch${o === this._active ? ' active' : ''}" data-opt="${o}" style="--c:${this._color(o)}">${this._label(o)}</button>`)
       .join('');
 
+    const ov = this._ov;
+    const overrideHtml = ov
+      ? `<div class="override">
+          <div class="ovrow"><span>Override:</span>${ov.options
+            .map((o) => `<button class="ovbtn" data-opt="${o}" style="--c:${o === ov.none ? 'var(--primary-color)' : this._color(o)}">${o === ov.none ? 'Follow schedule' : this._label(o)}</button>`)
+            .join('')}</div>
+          ${ov.stickyEntity ? '<label class="ovsticky"><input type="checkbox" id="sticky"> Keep override until I switch back to the schedule</label>' : ''}
+          <div class="ovhint"></div>
+        </div>`
+      : '';
+
     let body = '<div class="corner"></div>';
     DAY_LABELS.forEach((l, i) => (body += `<button class="dayhead" data-day="${i}" title="Fill the whole day">${l}</button>`));
     for (let r = 0; r < rows; r++) {
@@ -428,8 +499,20 @@ class StateScheduleCard extends Base {
       <style>
         :host { display:block; }
         ha-card { padding:12px 12px 8px; }
-        .top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
-        .title { font-size:1.2em; font-weight:500; }
+        .top { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; -webkit-user-select:none; }
+        .top:focus-visible { outline:2px solid var(--primary-color); border-radius:6px; }
+        .title { font-size:1.2em; font-weight:500; flex:1; }
+        .chev { transition:transform .15s; color:var(--secondary-text-color); font-size:1.2em; }
+        .chev.open { transform:rotate(180deg); }
+        .content { margin-top:8px; }
+        .content[hidden] { display:none; }
+        .override { border:1px solid var(--divider-color); border-radius:8px; padding:8px; margin-bottom:10px; }
+        .ovrow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+        .ovrow span { font-size:.8em; color:var(--secondary-text-color); margin-right:2px; }
+        .ovbtn { background:none; color:var(--primary-text-color); border:2px solid var(--c); border-radius:6px; padding:3px 10px; cursor:pointer; font:inherit; }
+        .ovbtn.active { background:var(--c); color:#fff; }
+        .ovsticky { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:.9em; cursor:pointer; }
+        .ovhint { margin-top:4px; font-size:.8em; color:var(--secondary-text-color); }
         .chip { color:#fff; border-radius:12px; padding:2px 10px; font-size:.85em; white-space:nowrap; }
         .palette { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; align-items:center; }
         .palette span { font-size:.8em; color:var(--secondary-text-color); margin-right:2px; }
@@ -448,14 +531,21 @@ class StateScheduleCard extends Base {
         .status.error { color:var(--error-color, #db4437); }
       </style>
       <ha-card>
-        <div class="top"><div class="title">${title}</div><div class="chip"></div></div>
-        <div class="palette"><span>Paint:</span>${palette}</div>
-        <div class="grid">${body}</div>
-        <div class="bar">
-          <button id="save" disabled>Save</button>
-          <button id="revert" disabled>Revert</button>
-          <button id="clear" title="Set the whole week to ${this._label(this._default)}">All ${this._label(this._default)}</button>
-          <div class="status${this._statusError ? ' error' : ''}">${this._status || ''}</div>
+        <div class="top" role="button" tabindex="0" aria-expanded="${this._expanded}">
+          <div class="title">${title}</div>
+          <div class="chip"></div>
+          <div class="chev${this._expanded ? ' open' : ''}">▾</div>
+        </div>
+        <div class="content"${this._expanded ? '' : ' hidden'}>
+          ${overrideHtml}
+          <div class="palette"><span>Paint:</span>${palette}</div>
+          <div class="grid">${body}</div>
+          <div class="bar">
+            <button id="save" disabled>Save</button>
+            <button id="revert" disabled>Revert</button>
+            <button id="clear" title="Set the whole week to ${this._label(this._default)}">All ${this._label(this._default)}</button>
+            <div class="status${this._statusError ? ' error' : ''}">${this._status || ''}</div>
+          </div>
         </div>
       </ha-card>`;
 
@@ -480,7 +570,27 @@ class StateScheduleCard extends Base {
     root.querySelector('#save').addEventListener('click', () => this._save());
     root.querySelector('#revert').addEventListener('click', () => this._revert());
     root.querySelector('#clear').addEventListener('click', () => this._fillAll(this._default));
+
+    const top = root.querySelector('.top');
+    const toggle = () => {
+      this._expanded = !this._expanded;
+      root.querySelector('.content').hidden = !this._expanded;
+      root.querySelector('.chev').classList.toggle('open', this._expanded);
+      top.setAttribute('aria-expanded', String(this._expanded));
+    };
+    top.addEventListener('click', toggle);
+    top.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    });
+    root.querySelectorAll('.ovbtn').forEach((b) => b.addEventListener('click', () => this._setOverride(b.dataset.opt)));
+    const box = root.querySelector('#sticky');
+    if (box) box.addEventListener('change', () => this._setSticky(box.checked));
+
     this._updateChip();
+    this._updateOverride();
     this._updateDirty();
   }
 

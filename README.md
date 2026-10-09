@@ -43,8 +43,42 @@ title: Cole – weekly internet schedule
 | `name` | entity name | Base name for the Scheduler entries the card creates |
 | `apply_now` | `true` | After saving, immediately set the entity to what the grid says for the current time |
 | `row_height` | `14` | Pixel height of a grid row |
+| `collapsed` | `true` | Start collapsed to a single line (title + current state). Click the header to expand |
+| `current` | `entity` | Entity shown in the "Now:" chip — the state actually in effect (see *Override*) |
+| `override` | – | Enables the override controls, see below |
 
 Click a **day name** to fill that whole day with the selected state.
+
+## Override
+
+Temporarily replace the schedule without editing it. Add three helpers and the bundled automation blueprint:
+
+| Helper | Role |
+| --- | --- |
+| `input_select.x_schedule` | What the **schedule** writes to — the card's `entity` |
+| `input_select.x_override` | Options: a "follow the schedule" option (`Schedule`), then each state |
+| `input_boolean.x_override_sticky` | The "keep until cleared" checkbox |
+| `input_select.x_now` | The state **in effect** — use this one in the rest of your setup |
+
+```yaml
+type: custom:state-schedule-card
+entity: input_select.x_schedule
+current: input_select.x_now
+override:
+  entity: input_select.x_override
+  sticky: input_boolean.x_override_sticky   # optional
+  none_option: Schedule                      # optional, default: first option
+```
+
+Then create an automation from the blueprint
+[`blueprints/automation/state_schedule_override.yaml`](blueprints/automation/state_schedule_override.yaml)
+([import](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fnickmayer%2Fstate-schedule-card%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fstate_schedule_override.yaml))
+and point its inputs at the helpers above. It copies *scheduled → now*, unless an override is active.
+
+In the card, pick **On / Slowdown / Off** to override, or **Follow schedule** to clear it. The checkbox decides how long it lasts:
+
+- **Unchecked** — the override ends the next time the *scheduled* state changes (a block boundary where the state stays the same does not count).
+- **Checked** — the override stays until you switch back to **Follow schedule**.
 
 ## How it behaves
 

@@ -1,0 +1,104 @@
+blueprint:
+  name: State Schedule Card – override handling
+  description: >-
+    Backend for the override feature of State Schedule Card.
+
+    The card's schedule writes to a *scheduled* entity. This automation copies
+    that to the *current* entity (the one the rest of your system uses), unless
+    an override is active.
+
+
+    **Override** is an input_select / select with a "follow the schedule" option
+    (default `Schedule`) plus one option per state. When it is set to a state,
+    that state wins over the schedule.
+
+
+    **Sticky** is an optional input_boolean. When off, the override ends the next
+    time the *scheduled* state changes. When on, it stays until you set the
+    override back to the "follow the schedule" option.
+  domain: automation
+  source_url: https://github.com/nickmayer/state-schedule-card/blob/main/blueprints/automation/state_schedule_override.yaml
+  input:
+    scheduled:
+      name: Scheduled state
+      description: The input_select / select the card's schedule writes to (the card's `entity`).
+      selector:
+        entity:
+          domain: [input_select, select]
+    current:
+      name: Current state
+      description: The input_select / select that holds the state actually in effect (the card's `current`).
+      selector:
+        entity:
+          domain: [input_select, select]
+    override:
+      name: Override
+      description: input_select / select whose options are the "follow the schedule" option plus every state.
+      selector:
+        entity:
+          domain: [input_select, select]
+    sticky:
+      name: Keep override until cleared (optional)
+      description: input_boolean. When on, the override survives schedule changes.
+      default: ""
+      selector:
+        entity:
+          domain: input_boolean
+    none_option:
+      name: "Follow the schedule" option
+      description: The option of the override entity that means "no override".
+      default: Schedule
+      selector:
+        text:
+
+mode: queued
+
+variables:
+  scheduled_entity: !input scheduled
+  current_entity: !input current
+  override_entity: !input override
+  sticky_entity: !input sticky
+  none_option: !input none_option
+
+triggers:
+  - trigger: state
+    entity_id: !input scheduled
+    id: scheduled
+  - trigger: state
+    entity_id: !input override
+    id: override
+  - trigger: homeassistant
+    event: start
+    id: start
+
+conditions:
+  # ignore the unavailable -> value blip that happens while Home Assistant starts
+  - condition: template
+    value_template: >-
+      {{ trigger.id != 'scheduled' or trigger.from_state.state not in ['unknown', 'unavailable'] }}
+
+actions:
+  - variables:
+      sched_state: "{{ states(scheduled_entity) }}"
+      ov_state: "{{ states(override_entity) }}"
+      is_sticky: "{{ sticky_entity != '' and is_state(sticky_entity, 'on') }}"
+      clear_override: >-
+        {{ trigger.id == 'scheduled' and ov_state != none_option and not is_sticky }}
+      target_state: >-
+        {{ sched_state if (clear_override or ov_state == none_option) else ov_state }}
+  - if:
+      - condition: template
+        value_template: "{{ clear_override }}"
+    then:
+      - action: "{{ override_entity.split('.')[0] }}.select_option"
+        target:
+          entity_id: "{{ override_entity }}"
+        data:
+          option: "{{ none_option }}"
+  - condition: template
+    value_template: "{{ target_state in (state_attr(current_entity, 'options') or []) }}"
+  - action: "{{ current_entity.split('.')[0] }}.select_option"
+    target:
+      entity_id: "{{ current_entity }}"
+    data:
+      option: "{{ target_state }}"
