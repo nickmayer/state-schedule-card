@@ -7,6 +7,8 @@ Pick a state (for example *On*, *Slowdown*, *Off*), drag across the week, press 
 It works with any `input_select` or `select` entity, and uses the
 [Scheduler integration](https://github.com/nielsfaber/scheduler-component) as its engine: saving converts the grid into Scheduler entries that call `input_select.select_option` (or `select.select_option`) at the start of each block.
 
+<p align="center"><img src="docs/screenshot.png" alt="State Schedule Card showing a Mon-Sun grid painted with On, Slowdown and Off blocks" width="360"></p>
+
 ## Why
 
 The built-in `schedule` helper is on/off only, and the Scheduler card edits one set of days at a time. This card gives you one picture of the whole week, with as many states as your entity has options.
