@@ -1,0 +1,11 @@
+{
+  "name": "state-schedule-card",
+  "version": "0.1.0",
+  "description": "Paint a weekly schedule of states on a Mon-Sun grid in Home Assistant (Scheduler integration frontend).",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  }
+}
