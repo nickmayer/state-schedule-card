@@ -10,6 +10,7 @@ import {
   columnToBlocks,
   gridToSchedules,
   optionAt,
+  rowOffset,
   overrideActive,
   formatDevices,
   formatMeasurement,
@@ -164,4 +165,11 @@ test('formatDevices / formatMeasurement', () => {
   assert.equal(formatMeasurement('250.7', 'kB/s'), '251 kB/s');
   assert.equal(formatMeasurement('unknown', 'Mbps'), '–');
   assert.equal(formatMeasurement('3'), '3');
+});
+
+test('rowOffset places the current time in the grid', () => {
+  assert.equal(rowOffset(new Date(2026, 9, 9, 0, 0, 0), 30), 0);
+  assert.equal(rowOffset(new Date(2026, 9, 9, 6, 0, 0), 30), 12);
+  assert.equal(rowOffset(new Date(2026, 9, 9, 23, 45, 0), 30), 47.5);
+  assert.equal(rowOffset(new Date(2026, 9, 9, 12, 15, 30), 15), 49 + 30 / 60 / 15);
 });
