@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.5.1';
+export const VERSION = '0.5.2';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -307,6 +307,7 @@ export class StateScheduleCard extends Base {
 
   disconnectedCallback() {
     clearInterval(this._nowTimer);
+    if (this._resizeObserver) this._resizeObserver.disconnect();
   }
 
   /** Move the blue "now" arrow and line to the current time. */
@@ -692,6 +693,11 @@ export class StateScheduleCard extends Base {
     grid.addEventListener('pointermove', (e) => this._move(e));
     grid.addEventListener('pointerup', () => this._up());
     grid.addEventListener('pointercancel', () => this._up());
+    if (typeof ResizeObserver !== 'undefined') {
+      if (this._resizeObserver) this._resizeObserver.disconnect();
+      this._resizeObserver = new ResizeObserver(() => this._placeNow());
+      this._resizeObserver.observe(grid);
+    }
     root.querySelector('#save').addEventListener('click', () => this._save());
     root.querySelector('#revert').addEventListener('click', () => this._revert());
     root.querySelector('#clear').addEventListener('click', () => this._fillAll(this._default));
@@ -702,6 +708,7 @@ export class StateScheduleCard extends Base {
       root.querySelector('.content').hidden = !this._expanded;
       root.querySelector('.chev').classList.toggle('open', this._expanded);
       top.setAttribute('aria-expanded', String(this._expanded));
+      this._placeNow();
     };
     top.addEventListener('click', toggle);
     top.addEventListener('keydown', (e) => {
