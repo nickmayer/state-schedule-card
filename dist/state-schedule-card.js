@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.6.0';
+export const VERSION = '0.6.1';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -322,7 +322,7 @@ export class StateScheduleCard extends Base {
     if (!cell) return;
     const top = `${head.offsetHeight + rowOffset(now, this._config.step) * this._config.row_height}px`;
     arrow.style.top = top;
-    arrow.style.left = `${cell.offsetLeft - 10}px`;
+    arrow.style.left = `${cell.offsetLeft}px`;
     line.style.top = top;
     line.style.left = `${cell.offsetLeft}px`;
     line.style.width = `${cell.offsetWidth}px`;
