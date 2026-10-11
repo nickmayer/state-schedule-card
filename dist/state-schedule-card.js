@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.5.1';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -311,11 +311,19 @@ export class StateScheduleCard extends Base {
 
   /** Move the blue "now" arrow and line to the current time. */
   _placeNow() {
-    const mark = this.shadowRoot && this.shadowRoot.querySelector('.now');
-    const head = mark && this.shadowRoot.querySelector('.dayhead');
+    const root = this.shadowRoot;
+    const arrow = root && root.querySelector('.nowarrow');
+    const line = arrow && root.querySelector('.nowline');
+    const head = line && root.querySelector('.dayhead');
     if (!head) return;
-    const top = head.offsetHeight + rowOffset(new Date(), this._config.step) * this._config.row_height;
-    mark.style.top = `${top}px`;
+    const now = new Date();
+    const cell = root.querySelector(`.cell[data-d="${(now.getDay() + 6) % 7}"][data-r="0"]`);
+    if (!cell) return;
+    const top = `${head.offsetHeight + rowOffset(now, this._config.step) * this._config.row_height}px`;
+    arrow.style.top = top;
+    line.style.top = top;
+    line.style.left = `${cell.offsetLeft}px`;
+    line.style.width = `${cell.offsetWidth}px`;
   }
 
   getCardSize() {
@@ -633,8 +641,8 @@ export class StateScheduleCard extends Base {
         .swatch { background:var(--c); color:#fff; border:2px solid transparent; border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; opacity:.55; }
         .swatch.active { opacity:1; border-color:var(--primary-text-color); }
         .grid { position:relative; display:grid; grid-template-columns:42px repeat(7, 1fr); gap:0 2px; touch-action:none; user-select:none; -webkit-user-select:none; }
-        .now { position:absolute; left:0; right:0; height:0; border-top:2px solid #2196f3; pointer-events:none; z-index:2; }
-        .now::before { content:''; position:absolute; left:30px; top:-7px; border-left:10px solid #2196f3; border-top:6px solid transparent; border-bottom:6px solid transparent; }
+        .nowline { position:absolute; height:0; border-top:2px solid #2196f3; pointer-events:none; z-index:2; }
+        .nowarrow { position:absolute; left:30px; width:0; height:0; margin-top:-5px; border-left:10px solid #2196f3; border-top:6px solid transparent; border-bottom:6px solid transparent; pointer-events:none; z-index:2; }
         .dayhead { background:none; border:none; color:var(--primary-text-color); font:inherit; font-weight:500; cursor:pointer; padding:4px 0; }
         .time { font-size:.7em; color:var(--secondary-text-color); text-align:right; padding-right:4px; line-height:1; transform:translateY(-4px); }
         .cell { cursor:crosshair; box-sizing:border-box; border-top:1px solid transparent; }
@@ -656,7 +664,7 @@ export class StateScheduleCard extends Base {
         <div class="content"${this._expanded ? '' : ' hidden'}>
           ${overrideHtml}
           <div class="palette"><span>Paint:</span>${palette}</div>
-          <div class="grid">${body}<div class="now" title="Now"></div></div>
+          <div class="grid">${body}<div class="nowarrow"></div><div class="nowline"></div></div>
           <div class="bar">
             <button id="save" disabled>Save</button>
             <button id="revert" disabled>Revert</button>
