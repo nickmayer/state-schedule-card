@@ -9,7 +9,7 @@
  * input_select.select_option / select.select_option on the configured entity.
  */
 
-export const VERSION = '0.5.2';
+export const VERSION = '0.6.0';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -322,6 +322,7 @@ export class StateScheduleCard extends Base {
     if (!cell) return;
     const top = `${head.offsetHeight + rowOffset(now, this._config.step) * this._config.row_height}px`;
     arrow.style.top = top;
+    arrow.style.left = `${cell.offsetLeft - 10}px`;
     line.style.top = top;
     line.style.left = `${cell.offsetLeft}px`;
     line.style.width = `${cell.offsetWidth}px`;
@@ -606,8 +607,8 @@ export class StateScheduleCard extends Base {
         </div>`
       : '';
 
-    let body = '<div class="corner"></div>';
-    DAY_LABELS.forEach((l, i) => (body += `<button class="dayhead" data-day="${i}" title="Fill the whole day">${l}</button>`));
+    const dayHeads = DAY_LABELS.map((l, i) => `<button class="dayhead" data-day="${i}" title="Fill the whole day">${l}</button>`).join('');
+    let body = `<div class="corner"></div>${dayHeads}<div class="corner"></div>`;
     for (let r = 0; r < rows; r++) {
       const label = r % perHour === 0 ? this._hourLabel(r * step) : '';
       body += `<div class="time" style="height:${rh}px">${label}</div>`;
@@ -615,7 +616,9 @@ export class StateScheduleCard extends Base {
         const hourStart = r % perHour === 0 ? ' hour' : '';
         body += `<div class="cell${hourStart}" data-d="${d}" data-r="${r}" style="height:${rh}px;background:${this._color(this._grid[d][r])}"></div>`;
       }
+      body += `<div class="time right" style="height:${rh}px">${label}</div>`;
     }
+    body += `<div class="corner"></div>${dayHeads}<div class="corner"></div>`;
 
     root.innerHTML = `
       <style>
@@ -641,11 +644,12 @@ export class StateScheduleCard extends Base {
         .palette span { font-size:.8em; color:var(--secondary-text-color); margin-right:2px; }
         .swatch { background:var(--c); color:#fff; border:2px solid transparent; border-radius:6px; padding:4px 12px; cursor:pointer; font:inherit; opacity:.55; }
         .swatch.active { opacity:1; border-color:var(--primary-text-color); }
-        .grid { position:relative; display:grid; grid-template-columns:42px repeat(7, 1fr); gap:0 2px; touch-action:none; user-select:none; -webkit-user-select:none; }
+        .grid { position:relative; display:grid; grid-template-columns:42px repeat(7, 1fr) 42px; gap:0 2px; touch-action:none; user-select:none; -webkit-user-select:none; }
         .nowline { position:absolute; height:0; border-top:2px solid #2196f3; pointer-events:none; z-index:2; }
-        .nowarrow { position:absolute; left:30px; width:0; height:0; margin-top:-5px; border-left:10px solid #2196f3; border-top:6px solid transparent; border-bottom:6px solid transparent; pointer-events:none; z-index:2; }
+        .nowarrow { position:absolute; width:0; height:0; margin-top:-5px; border-left:10px solid #2196f3; border-top:6px solid transparent; border-bottom:6px solid transparent; pointer-events:none; z-index:2; }
         .dayhead { background:none; border:none; color:var(--primary-text-color); font:inherit; font-weight:500; cursor:pointer; padding:4px 0; }
         .time { font-size:.7em; color:var(--secondary-text-color); text-align:right; padding-right:4px; line-height:1; transform:translateY(-4px); }
+        .time.right { text-align:left; padding-right:0; padding-left:4px; }
         .cell { cursor:crosshair; box-sizing:border-box; border-top:1px solid transparent; }
         .cell.hour { border-top:1px solid rgba(255,255,255,.35); }
         .bar { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
