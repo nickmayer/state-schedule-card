@@ -71,7 +71,7 @@ test('time that no helper covers is the default state', () => {
 });
 
 test('helper names depend on the entity and the state', () => {
-  assert.equal(helperName('Internet Cole', 'Off'), 'Internet Cole schedule Off');
+  assert.equal(helperName('Internet Cole', 'Off'), 'Internet Cole Off');
 });
 
 test('the automation applies the active helper and falls back to the default', () => {
@@ -79,20 +79,20 @@ test('the automation applies the active helper and falls back to the default', (
     entity: 'input_select.internet_cole',
     title: 'Internet Cole',
     helpers: [
-      { entity_id: 'schedule.internet_cole_schedule_slowdown', option: 'Slowdown' },
-      { entity_id: 'schedule.internet_cole_schedule_off', option: 'Off' },
+      { entity_id: 'schedule.internet_cole_slowdown', option: 'Slowdown' },
+      { entity_id: 'schedule.internet_cole_off', option: 'Off' },
     ],
     defaultOption: 'On',
   });
   assert.equal(automation.mode, 'restart');
-  assert.deepEqual(automation.triggers[0].entity_id, ['schedule.internet_cole_schedule_slowdown', 'schedule.internet_cole_schedule_off']);
+  assert.deepEqual(automation.triggers[0].entity_id, ['schedule.internet_cole_slowdown', 'schedule.internet_cole_off']);
   assert.ok(automation.triggers.some((t) => t.trigger === 'homeassistant'));
   const [wait, change] = automation.actions;
   assert.ok(wait.delay);
   assert.equal(change.action, 'input_select.select_option');
   assert.equal(change.target.entity_id, 'input_select.internet_cole');
   assert.ok(change.data.option.includes('namespace(option="On")'));
-  assert.ok(change.data.option.includes('["schedule.internet_cole_schedule_off","Off"]'));
+  assert.ok(change.data.option.includes('["schedule.internet_cole_off","Off"]'));
 });
 
 test('optionAt maps a Date to the right cell (Monday-first)', () => {

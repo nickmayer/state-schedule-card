@@ -9,7 +9,7 @@
  * copies the helpers to the input_select / select entity.
  */
 
-export const VERSION = '0.7.0';
+export const VERSION = '0.7.1';
 
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -45,7 +45,7 @@ export function emptyGrid(step, fill) {
  * helpers by this name, so the states of different entities do not mix.
  */
 export function helperName(base, option) {
-  return `${base} schedule ${option}`;
+  return `${base} ${option}`;
 }
 
 /**

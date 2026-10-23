@@ -86,7 +86,7 @@ In the card, pick **On / Slowdown / Off** to override, or **Follow schedule** to
 
 ## How it behaves
 
-- **The card owns the helpers for its entity.** On save it creates (or updates) one schedule helper per state except the default, named `<name> schedule <state>`, and an automation `State schedule: <name>` that sets the entity to the state whose helper is on, or to the default state when none is. Edit the helpers by hand and the card shows the result next time it loads.
+- **The card owns the helpers for its entity.** On save it creates (or updates) one schedule helper per state except the default, named `<name> <state>`, and an automation `State schedule: <name>` that sets the entity to the state whose helper is on, or to the default state when none is. Edit the helpers by hand and the card shows the result next time it loads.
 - The automation waits two seconds before it acts, so one block ending where the next starts gives a single change, not a flicker to the default state in between.
 - The schedule only acts when a helper switches on or off. A manual change to the entity holds until the next block starts.
 - If you used an earlier version that was built on the Scheduler integration, its schedules are not read. Paint the week once and save; you can then remove the Scheduler entries and integration.
