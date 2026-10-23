@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DAYS,
-  expandWeekdays,
   parseTime,
   formatTime,
   emptyGrid,
-  schedulesToGrid,
-  columnToBlocks,
-  gridToSchedules,
+  helpersToGrid,
+  gridToHelperDays,
+  helperName,
+  buildApplyAutomation,
   optionAt,
   rowOffset,
   overrideActive,
@@ -23,41 +23,33 @@ const paint = (grid, day, fromH, toH, option) => {
   for (let r = (fromH * 60) / STEP; r < (toH * 60) / STEP; r++) grid[d][r] = option;
 };
 
-// Simulates how Scheduler exposes a schedule's attributes after scheduler.add
-const toAttributes = (s) => ({
-  weekdays: s.weekdays,
-  timeslots: s.timeslots.map((t) => `${t.start} - ${t.stop}`),
-  actions: s.timeslots.map((t) => ({ service: t.actions[0].service, data: { option: t.actions[0].service_data.option } })),
-});
-
 test('time helpers', () => {
   assert.equal(parseTime('23:30:00'), 1410);
   assert.equal(formatTime(1410), '23:30:00');
-  assert.equal(formatTime(1440), '00:00:00');
+  assert.equal(formatTime(1440), '24:00:00');
 });
 
-test('expandWeekdays handles daily/workday/weekend', () => {
-  assert.deepEqual(expandWeekdays(['daily']), DAYS);
-  assert.deepEqual(expandWeekdays(['workday']), ['mon', 'tue', 'wed', 'thu', 'fri']);
-  assert.deepEqual(expandWeekdays(['weekend']), ['sat', 'sun']);
-  assert.deepEqual(expandWeekdays(['sun', 'mon']), ['mon', 'sun']);
-});
+// What the schedule helper API returns, built from the blocks of the grid
+const asHelpers = (grid, options) => options.map((option) => ({ option, config: { name: option, ...gridToHelperDays(grid, option, STEP) } }));
 
-test('a column of one state is split in two (Scheduler needs >1 slot)', () => {
-  const col = new Array(48).fill('On');
-  const blocks = columnToBlocks(col, STEP);
-  assert.equal(blocks.length, 2);
-  assert.deepEqual([blocks[0].start, blocks[0].stop, blocks[1].start, blocks[1].stop], [0, 720, 720, 1440]);
-});
-
-test('identical days are grouped into one schedule', () => {
+test('a block that runs to midnight ends at 24:00:00', () => {
   const grid = emptyGrid(STEP, 'On');
-  const schedules = gridToSchedules(grid, { entity: 'input_select.x', step: STEP, baseName: 'X', service: 'input_select.select_option' });
-  assert.equal(schedules.length, 1);
-  assert.deepEqual(schedules[0].weekdays, ['daily']);
+  paint(grid, 'mon', 23.5, 24, 'Slowdown');
+  assert.deepEqual(gridToHelperDays(grid, 'Slowdown', STEP).monday, [{ from: '23:30:00', to: '24:00:00' }]);
+  assert.deepEqual(gridToHelperDays(grid, 'Slowdown', STEP).tuesday, []);
 });
 
-test('round trip: grid -> schedules -> grid is lossless', () => {
+test('separate blocks of a state on a day are kept apart', () => {
+  const grid = emptyGrid(STEP, 'On');
+  paint(grid, 'wed', 0, 6, 'Off');
+  paint(grid, 'wed', 12, 13, 'Off');
+  assert.deepEqual(gridToHelperDays(grid, 'Off', STEP).wednesday, [
+    { from: '00:00:00', to: '06:00:00' },
+    { from: '12:00:00', to: '13:00:00' },
+  ]);
+});
+
+test('round trip: grid -> schedule helpers -> grid is lossless', () => {
   const grid = emptyGrid(STEP, 'On');
   for (const d of DAYS) {
     paint(grid, d, 0, 6, 'Off');
@@ -69,48 +61,38 @@ test('round trip: grid -> schedules -> grid is lossless', () => {
   paint(grid, 'sat', 0.5, 1, 'Slowdown');
   paint(grid, 'sat', 1, 6, 'Off');
 
-  const schedules = gridToSchedules(grid, { entity: 'input_select.x', step: STEP, baseName: 'X', service: 'input_select.select_option' });
-  assert.ok(schedules.length >= 3);
-  const back = schedulesToGrid(schedules.map(toAttributes), STEP, 'On');
-  assert.equal(back.skipped, 0);
-  assert.deepEqual(back.grid, grid);
+  const back = helpersToGrid(asHelpers(grid, ['Slowdown', 'Off']), STEP, 'On');
+  assert.deepEqual(back, grid);
 });
 
-test('start-only schedules (like the Scheduler card makes) are understood', () => {
-  const { grid } = schedulesToGrid(
-    [
-      {
-        weekdays: ['daily'],
-        timeslots: ['00:00:00', '06:00:00', '23:30:00'],
-        actions: [{ data: { option: 'Off' } }, { data: { option: 'On' } }, { data: { option: 'Slowdown' } }],
-      },
+test('time that no helper covers is the default state', () => {
+  const grid = helpersToGrid([], STEP, 'On');
+  assert.deepEqual(grid, emptyGrid(STEP, 'On'));
+});
+
+test('helper names depend on the entity and the state', () => {
+  assert.equal(helperName('Internet Cole', 'Off'), 'Internet Cole schedule Off');
+});
+
+test('the automation applies the active helper and falls back to the default', () => {
+  const automation = buildApplyAutomation({
+    entity: 'input_select.internet_cole',
+    title: 'Internet Cole',
+    helpers: [
+      { entity_id: 'schedule.internet_cole_schedule_slowdown', option: 'Slowdown' },
+      { entity_id: 'schedule.internet_cole_schedule_off', option: 'Off' },
     ],
-    STEP,
-    'On',
-  );
-  assert.equal(grid[0][0], 'Off');
-  assert.equal(grid[0][11], 'Off');
-  assert.equal(grid[0][12], 'On');
-  assert.equal(grid[0][46], 'On'); // 23:00
-  assert.equal(grid[0][47], 'Slowdown'); // 23:30
-  assert.equal(grid[1][0], 'Off'); // next day's first slot starts at 00:00
-});
-
-test('overnight slot continues into the next day', () => {
-  const { grid } = schedulesToGrid(
-    [{ weekdays: ['fri'], timeslots: ['22:00:00 - 02:00:00'], actions: [{ data: { option: 'Off' } }] }],
-    STEP,
-    'On',
-  );
-  assert.equal(grid[DAYS.indexOf('fri')][44], 'Off');
-  assert.equal(grid[DAYS.indexOf('sat')][3], 'Off');
-  assert.equal(grid[DAYS.indexOf('sat')][4], 'On');
-});
-
-test('unreadable schedules are skipped, not fatal', () => {
-  const { grid, skipped } = schedulesToGrid([{ weekdays: ['mon'], timeslots: ['00:00:00 - 12:00:00'], actions: [] }], STEP, 'On');
-  assert.equal(skipped, 1);
-  assert.equal(grid[0][0], 'On');
+    defaultOption: 'On',
+  });
+  assert.equal(automation.mode, 'restart');
+  assert.deepEqual(automation.triggers[0].entity_id, ['schedule.internet_cole_schedule_slowdown', 'schedule.internet_cole_schedule_off']);
+  assert.ok(automation.triggers.some((t) => t.trigger === 'homeassistant'));
+  const [wait, change] = automation.actions;
+  assert.ok(wait.delay);
+  assert.equal(change.action, 'input_select.select_option');
+  assert.equal(change.target.entity_id, 'input_select.internet_cole');
+  assert.ok(change.data.option.includes('namespace(option="On")'));
+  assert.ok(change.data.option.includes('["schedule.internet_cole_schedule_off","Off"]'));
 });
 
 test('optionAt maps a Date to the right cell (Monday-first)', () => {
